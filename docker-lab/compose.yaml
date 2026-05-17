@@ -1,0 +1,12 @@
+services:
+  web:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8000"
+    environment:
+      PORT: "8000"
+    volumes:
+      # Edit main.py without rebuild; change requirements.txt → rebuild (--build).
+      - ./backend:/app
