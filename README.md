@@ -4,10 +4,13 @@ Canonical deploy/playground repo at **`/home/sha/outer`**. **`docker-lab/`** sta
 
 ## Quickstart
 
+From **`/home/sha/outer`** (repo root):
+
 ```bash
-cd docker-lab
 docker compose up --build
 ```
+
+(`compose.yaml` at the root **includes** `docker-lab/compose.yaml`. You can still run from **`docker-lab/`** if you prefer.)
 
 - Swagger: http://localhost:8080/docs  
 - DB ping: http://localhost:8080/db/ping  
