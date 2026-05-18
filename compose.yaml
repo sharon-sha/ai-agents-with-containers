@@ -33,7 +33,8 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
-      - "5432:5432"
+      # Host 5432 is often taken by a local Postgres — map another host port if needed.
+      - "${LAB_PG_PUBLISH:-5433}:5432"
       - "8080:8000"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d docker_lab"]
