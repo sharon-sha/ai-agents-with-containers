@@ -1,17 +1,19 @@
-# Blueprint for repo layout:
-#   docker-lab/backend/Dockerfile
-#   docker-lab/backend/main.py
-#
-# Docs: https://render.com/docs/blueprint-spec
-# Monorepo rootDir: https://render.com/docs/monorepo-support
+# Repo: outer — Dockerfile: docker-lab/backend/Dockerfile
+# https://render.com/docs/blueprint-spec
+
+databases:
+  - name: docker-lab-postgres
+    plan: free
+    region: oregon
+    databaseName: docker_lab
 
 services:
   - type: web
     name: docker-lab-api
     runtime: docker
     branch: main
-    region: oregon # e.g. frankfurt (EU), singapore — https://render.com/docs/regions
-    plan: starter # use `free` only if your workspace/runtime allows it (free web sleeps when idle)
+    region: oregon
+    plan: starter
     rootDir: docker-lab/backend
     dockerfilePath: ./Dockerfile
     dockerContext: .
@@ -19,7 +21,11 @@ services:
     envVars:
       - key: PYTHONUNBUFFERED
         value: "1"
-      # Render sets PORT automatically for web services — Dockerfile uses ${PORT:-8000}
+      - key: DATABASE_URL
+        fromDatabase:
+          name: docker-lab-postgres
+          property: connectionString
     buildFilter:
       paths:
         - docker-lab/backend/**
+        - render.yaml

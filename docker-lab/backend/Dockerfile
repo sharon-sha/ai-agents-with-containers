@@ -11,5 +11,5 @@ ENV PYTHONUNBUFFERED=1
 
 EXPOSE 8000
 
-# Railway injects PORT; default 8000 matches Compose mapping below.
+# Render/Railway inject PORT — no --reload in prod images.
 CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}"]

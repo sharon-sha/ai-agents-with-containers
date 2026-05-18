@@ -85,3 +85,55 @@ Same codebase + same Dockerfile → parity achieved.
 | Directory … does not exist | Correct **Root Directory** to path containing `Dockerfile`. |
 | Build succeeds, browser error | **Generate Domain**; ensure app binds **`0.0.0.0`** (already true in this lab). |
 | Wrong builder | Dockerfile at wrong depth or Railpack override — fix root / config. |
+
+---
+
+## Phase 5 — Data & persistence (Compose + Render)
+
+### Ephemeral vs persisted
+
+| What | Survives container restart? |
+|------|-----------------------------|
+| Files **inside** the app container filesystem only | **No** (unless copied into an image layer). |
+| **Docker volume** mounted at Postgres data dir (`postgres_data`) | **Yes** — DB files live on the host volume. |
+| Render **managed Postgres** disk | **Yes** — Render operates the cluster + storage. |
+
+### Local (Compose)
+
+`compose.yaml` adds **`db`** (`postgres:16-alpine`) + named volume **`postgres_data`**.
+
+```bash
+docker compose down          # stops containers; volume keeps data
+docker compose down -v       # deletes volume → empty DB next up
+```
+
+Checkpoint flow:
+
+1. `docker compose up --build`
+2. **POST** http://localhost:8080/db/items with JSON `{"name":"hello"}`
+3. **GET** http://localhost:8080/db/items — row appears
+4. **GET** http://localhost:8080/db/ping — `{"db":true}`
+5. `docker compose restart web` — rows still there (data is in **`postgres_data`**)
+
+Secrets: keep real credentials out of git — use **`docker-lab/.env.example`** as a template only; **`DATABASE_URL`** for Compose is inlined for local dev convenience.
+
+### Render (hosted Postgres)
+
+Repo-root **`render.yaml`** declares **`docker-lab-postgres`** and wires **`DATABASE_URL`** via **`fromDatabase.connectionString`** (same region **`oregon`** as the web service).
+
+After you push:
+
+```bash
+git add docker-lab render.yaml .gitignore
+git commit -m "Phase 5: Postgres + Render DATABASE_URL"
+git push origin main
+```
+
+In Render → **Blueprints** → apply/sync so both **Postgres** and **web** pick up the changes (first deploy may take longer while Postgres provisions).
+
+Verify:
+
+- https://`your-service`.onrender.com/db/ping → `{"db":true}`
+- POST/GET `/db/items` on the public URL
+
+Render **free** Postgres tier may still spin down / have limits — upgrade **`plan`** on the database block when you outgrow it ([pricing](https://render.com/pricing#postgresql)).

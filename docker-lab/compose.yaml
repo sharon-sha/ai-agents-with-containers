@@ -7,6 +7,32 @@ services:
       - "8080:8000"
     environment:
       PORT: "8000"
+      DATABASE_URL: postgresql+psycopg2://postgres:postgres@db:5432/docker_lab
     volumes:
-      # Edit main.py without rebuild; change requirements.txt → rebuild (--build).
       - ./backend:/app
+    depends_on:
+      db:
+        condition: service_healthy
+    # Dev convenience: edit code without rebuild (prod Dockerfile CMD has no --reload).
+    command: >
+      sh -c "pip install -q -r requirements.txt &&
+             uvicorn main:app --host 0.0.0.0 --port $${PORT:-8000} --reload"
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: docker_lab
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d docker_lab"]
+      interval: 3s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  postgres_data:

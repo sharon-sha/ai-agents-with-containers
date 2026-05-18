@@ -1,8 +1,20 @@
 # outer
 
-Sibling folder to **`~/ai agents with containers`**. Git repo initialized here; **`docker-lab/`** is a copy of the FastAPI Docker tutorial from that project.
+Canonical deploy/playground repo at **`/home/sha/outer`**. **`docker-lab/`** stays in sync with `~/ai agents with containers/docker-lab` when you ask to “use outer.”
 
-Full path: `/home/sha/outer`
+## Quickstart
 
-- Local API: `cd docker-lab && docker compose up --build` → http://localhost:8080/docs  
-- Railway **Root Directory**: `docker-lab/backend` (see `docker-lab/README.md`).
+```bash
+cd docker-lab
+docker compose up --build
+```
+
+- Swagger: http://localhost:8080/docs  
+- DB ping: http://localhost:8080/db/ping  
+
+## Deploy
+
+- **Render:** repo-root **`render.yaml`** Blueprint — Postgres + **`DATABASE_URL`**. Sync after push.  
+- **Railway (optional):** Root Directory **`docker-lab/backend`** (see **`docker-lab/README.md`**).
+
+Do not commit **`.env`** — use **`docker-lab/.env.example`** as a template only.
