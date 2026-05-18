@@ -10,7 +10,7 @@ From **`/home/sha/outer`** (repo root):
 docker compose up --build
 ```
 
-(`compose.yaml` at the root **includes** `docker-lab/compose.yaml`. You can still run from **`docker-lab/`** if you prefer.)
+(`compose.yaml` defines **`web` + `db`** together; **`web` shares `db`'s network** → **`DATABASE_URL`** uses **`127.0.0.1`** locally. Ports **8080** (API) and **5432** are mapped on **`db`**. You can also run `cd docker-lab && docker compose up --build`.)
 
 - Swagger: http://localhost:8080/docs  
 - DB ping: http://localhost:8080/db/ping  
