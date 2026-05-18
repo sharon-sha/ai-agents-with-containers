@@ -11,7 +11,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sess
 def _database_url() -> str:
     raw = os.environ.get(
         "DATABASE_URL",
-        "postgresql+psycopg2://postgres:postgres@db:5432/docker_lab",
+        "postgresql+psycopg2://postgres:postgres@127.0.0.1:5432/docker_lab",
     )
     if raw.startswith("postgresql+psycopg2://"):
         return raw
