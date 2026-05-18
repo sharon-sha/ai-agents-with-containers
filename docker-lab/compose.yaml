@@ -1,19 +1,21 @@
+# Standalone: run from this directory (`docker compose up --build`).
+#
+# `web` shares Postgres network stack → DATABASE_URL uses 127.0.0.1 (see repo-root compose).
+
 services:
   web:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    ports:
-      - "8080:8000"
+    network_mode: service:db
     environment:
       PORT: "8000"
-      DATABASE_URL: postgresql+psycopg2://postgres:postgres@db:5432/docker_lab
+      DATABASE_URL: postgresql+psycopg2://postgres:postgres@127.0.0.1:5432/docker_lab
     volumes:
       - ./backend:/app
     depends_on:
       db:
         condition: service_healthy
-    # Dev convenience: edit code without rebuild (prod Dockerfile CMD has no --reload).
     command: >
       sh -c "pip install -q -r requirements.txt &&
              uvicorn main:app --host 0.0.0.0 --port $${PORT:-8000} --reload"
@@ -28,6 +30,7 @@ services:
       - postgres_data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
+      - "8080:8000"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d docker_lab"]
       interval: 3s
