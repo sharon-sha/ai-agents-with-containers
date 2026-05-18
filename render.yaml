@@ -1,0 +1,25 @@
+# Blueprint for repo layout:
+#   docker-lab/backend/Dockerfile
+#   docker-lab/backend/main.py
+#
+# Docs: https://render.com/docs/blueprint-spec
+# Monorepo rootDir: https://render.com/docs/monorepo-support
+
+services:
+  - type: web
+    name: docker-lab-api
+    runtime: docker
+    branch: main
+    region: oregon # e.g. frankfurt (EU), singapore — https://render.com/docs/regions
+    plan: starter # use `free` only if your workspace/runtime allows it (free web sleeps when idle)
+    rootDir: docker-lab/backend
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHONUNBUFFERED
+        value: "1"
+      # Render sets PORT automatically for web services — Dockerfile uses ${PORT:-8000}
+    buildFilter:
+      paths:
+        - docker-lab/backend/**
