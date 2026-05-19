@@ -1,12 +1,41 @@
 import os
 from collections.abc import Generator
 from contextlib import asynccontextmanager
+from pathlib import Path
 from urllib.parse import urlparse
 
 from fastapi import Depends, FastAPI, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import create_engine, select, text
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sessionmaker
+
+
+def _is_render() -> bool:
+    """Render sets these on native services; Docker deploys may omit them."""
+    if os.environ.get("RENDER", "").lower() in {"true", "1", "yes"}:
+        return True
+    if os.environ.get("RENDER_SERVICE_ID"):
+        return True
+    if os.environ.get("RENDER_EXTERNAL_HOSTNAME"):
+        return True
+    return False
+
+
+def _bootstrap_env() -> None:
+    """Load docker-lab/.env for local dev. Render injects env vars — never rely on .env in prod."""
+    if _is_render():
+        return
+    try:
+        from dotenv import load_dotenv
+    except ImportError:
+        return
+    here = Path(__file__).resolve().parent
+    for path in (here / ".env", here.parent / ".env"):
+        if path.is_file():
+            load_dotenv(path, override=False)
+
+
+_bootstrap_env()
 
 
 def _pg_hostname(url: str) -> str | None:
@@ -27,26 +56,49 @@ def _normalize_sqlalchemy_url(raw: str) -> str:
     return raw
 
 
-def _is_render() -> bool:
-    if os.environ.get("RENDER", "").lower() in {"true", "1", "yes"}:
-        return True
-    return bool(os.environ.get("RENDER_SERVICE_ID") or os.environ.get("RENDER_EXTERNAL_HOSTNAME"))
-
-
 def _allow_loopback_db() -> bool:
     return os.environ.get("ALLOW_LOOPBACK_DATABASE", "").lower() in {"1", "true", "yes"}
 
 
+def _raw_database_url_string() -> str:
+    """Prefer env; optional file path; Render Docker secret files under /etc/secrets/."""
+    direct = (os.environ.get("DATABASE_URL") or "").strip()
+    if direct:
+        return direct
+    path = (os.environ.get("DATABASE_URL_FILE") or "").strip()
+    if path:
+        p = Path(path)
+        if p.is_file():
+            return p.read_text(encoding="utf-8").strip()
+    for candidate in (Path("/etc/secrets/DATABASE_URL"), Path("/etc/secrets/database_url")):
+        if candidate.is_file():
+            return candidate.read_text(encoding="utf-8").strip()
+    return ""
+
+
 def _database_url() -> str:
-    raw = (os.environ.get("DATABASE_URL") or "").strip()
+    raw = _raw_database_url_string()
     if not raw:
         hint = (
             "Docker Compose should set DATABASE_URL on the web service. "
-            "On Render: Environment → DATABASE_URL from Postgres **Internal Database URL**, "
-            "or sync Blueprint `fromDatabase`."
+            "On Render: PostgreSQL → Internal Database URL → Web service → Environment "
+            "(runtime variables, not build-only) → key exactly DATABASE_URL → "
+            "Save *and deploy* (not Save only). "
+            "If the web service was not created from this repo Blueprint, render.yaml fromDatabase "
+            "does not apply. "
+            "URL host must be your Render Postgres host (private URLs often look like dpg-…@…/db)."
         )
         if _is_render():
-            raise RuntimeError(f"DATABASE_URL is missing on Render. {hint}")
+            related = sorted(
+                k
+                for k in os.environ
+                if any(
+                    x in k.upper()
+                    for x in ("DATABASE", "POSTGRES", "POSTGRE", "SQL", "PG")
+                )
+            )
+            extra = f" Env keys mentioning DB/postgres: {related or 'none'}."
+            raise RuntimeError(f"DATABASE_URL is missing on Render.{extra} {hint}")
         raise RuntimeError(f"DATABASE_URL is missing. {hint}")
 
     out = _normalize_sqlalchemy_url(raw)
