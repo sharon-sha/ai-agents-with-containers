@@ -1,6 +1,7 @@
 import os
 from collections.abc import Generator
 from contextlib import asynccontextmanager
+from urllib.parse import urlparse
 
 from fastapi import Depends, FastAPI, HTTPException
 from pydantic import BaseModel, Field
@@ -8,19 +9,63 @@ from sqlalchemy import create_engine, select, text
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sessionmaker
 
 
-def _database_url() -> str:
-    raw = os.environ.get(
-        "DATABASE_URL",
-        "postgresql+psycopg2://postgres:postgres@127.0.0.1:5432/docker_lab",
-    )
+def _pg_hostname(url: str) -> str | None:
+    for prefix in ("postgresql+psycopg2://", "postgresql://", "postgres://"):
+        if url.startswith(prefix):
+            u = url.replace(prefix, "postgresql://", 1)
+            return urlparse(u).hostname
+    return urlparse(url).hostname
+
+
+def _normalize_sqlalchemy_url(raw: str) -> str:
     if raw.startswith("postgresql+psycopg2://"):
         return raw
-    # Render sometimes supplies postgres://; SQLAlchemy wants postgresql+psycopg2.
     if raw.startswith("postgres://"):
         return raw.replace("postgres://", "postgresql+psycopg2://", 1)
     if raw.startswith("postgresql://"):
         return raw.replace("postgresql://", "postgresql+psycopg2://", 1)
     return raw
+
+
+def _is_render() -> bool:
+    if os.environ.get("RENDER", "").lower() in {"true", "1", "yes"}:
+        return True
+    return bool(os.environ.get("RENDER_SERVICE_ID") or os.environ.get("RENDER_EXTERNAL_HOSTNAME"))
+
+
+def _allow_loopback_db() -> bool:
+    return os.environ.get("ALLOW_LOOPBACK_DATABASE", "").lower() in {"1", "true", "yes"}
+
+
+def _database_url() -> str:
+    raw = (os.environ.get("DATABASE_URL") or "").strip()
+    if not raw:
+        hint = (
+            "Docker Compose should set DATABASE_URL on the web service. "
+            "On Render: Environment → DATABASE_URL from Postgres **Internal Database URL**, "
+            "or sync Blueprint `fromDatabase`."
+        )
+        if _is_render():
+            raise RuntimeError(f"DATABASE_URL is missing on Render. {hint}")
+        raise RuntimeError(f"DATABASE_URL is missing. {hint}")
+
+    out = _normalize_sqlalchemy_url(raw)
+    host = _pg_hostname(out)
+
+    if host in (None, "localhost", "127.0.0.1", "::1"):
+        if _is_render():
+            raise RuntimeError(
+                "DATABASE_URL points at localhost, but Render Postgres is on another host. "
+                "Paste the **Internal Database URL** from your Render PostgreSQL service "
+                "(host looks like dpg-xxxx.a.region-postgres.render.com)."
+            )
+        if not _allow_loopback_db():
+            raise RuntimeError(
+                "DATABASE_URL uses localhost but ALLOW_LOOPBACK_DATABASE is not set. "
+                "Local Compose sets both (see compose.yaml)."
+            )
+
+    return out
 
 
 class Base(DeclarativeBase):
